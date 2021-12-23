@@ -1,87 +1,107 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import Loading from '../assets/img/loading.gif';
-import postImage from '../assets/img/newspaper-icon-png.jpg';
-import PostForm from '../components/Posts/PostForm';
-import Post from '../components/Posts/Post';
-import { fetchPosts } from '../reducks/posts/operations';
-import { getPosts } from '../reducks/posts/selectors';
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchImages } from "../reducks/images/operations";
+import { getImages, getHasNext } from "../reducks/images/selectors";
+import { getFavourites } from "../reducks/favourites/selectors";
+import {
+  addFavourite,
+  fetchFromLocalStorage,
+} from "../reducks/favourites/operations";
+import ImgMainBackground from "../assets/img/main-background.png";
+import ImgIconSearch from "../assets/img/icon-search.svg";
+import ImgIconHeart from "../assets/img/icon-heart.svg";
+import Preview from "../components/Common/Preview";
 
 const Home = () => {
-    const dispatch = useDispatch();
-    const selector = useSelector(state => state);
-    const posts = getPosts(selector);
-    let [page, setPage] = useState(1);
-    const [isLoading, setIsLoading] = useState(false);
+  const dispatch = useDispatch();
+  const selector = useSelector((state) => state);
+  const images = getImages(selector);
+  const hasNext = getHasNext(selector);
+  const [page, setPage] = useState(1);
+  const [showPreview, setShowPreview] = useState(false);
+  const [selectedImageId, setSelectedImageId] = useState(null);
+  const favourites = getFavourites(selector);
 
-    useEffect(() => {
-        dispatch(fetchPosts({ page }));
-        // eslint-disable-next-line
-    }, []);
+  useEffect(() => {
+    dispatch(fetchFromLocalStorage());
+    dispatch(fetchImages(page));
+    setPage(page + 1);
+  }, []);
 
-    // Infinite Scroll Pagination Flow
-    const observer = useRef();
+  const clickImage = (imageId) => {
+    setSelectedImageId(imageId);
+    setShowPreview(true);
+  };
 
-    // Reference to a very last post element
-    const lastPostElement = useCallback(
-        node => {
-            if (isLoading) return;
-            // Disconnect reference from previous element, so that new last element is hook up correctly
-            if (observer.current) {
-                observer.current.disconnect();
-            }
+  const clickShowMore = () => {
+    dispatch(fetchImages(page));
+    setPage(page + 1);
+  };
 
-            // Observe changes in the intersection of target element
-            observer.current = new IntersectionObserver(async entries => {
-                // That means that we are on the page somewhere, In our case last element of the page
-                if (entries[0].isIntersecting && posts.next) {
-                    // Proceed fetch new page
-                    setIsLoading(true);
-                    setPage(++page);
-                    await dispatch(fetchPosts({ page }));
-                    setIsLoading(false);
-                }
-            });
-
-            // Reconnect back with the new last post element
-            if (node) {
-                observer.current.observe(node);
-            }
-        },
-        // eslint-disable-next-line
-        [posts.next]
-    );
-
-    return (
-        <section className="content">
-            <PostForm />
-            <section className="posts">
-                {posts.results.length > 0 ? (
-                    <ul>
-                        {posts.results.map((post, index) => {
-                            return (
-                                <Post
-                                    ref={index === posts.results.length - 1 ? lastPostElement : null}
-                                    key={post.id}
-                                    post={post}
-                                />
-                            );
-                        })}
-                    </ul>
-                ) : (
-                    <div className="no-post">
-                        <img width="72" src={postImage} alt="icon" />
-                        <p>No posts here yet...</p>
-                    </div>
-                )}
-                {isLoading && (
-                    <div className="loading">
-                        <img src={Loading} className="" alt="" />
-                    </div>
-                )}
-            </section>
+  const clickFavourite = (image) => {
+    dispatch(addFavourite(image));
+  };
+  return (
+    <>
+      {showPreview && (
+        <Preview
+          setShowPreview={setShowPreview}
+          selectedImageId={selectedImageId}
+        />
+      )}
+      <div class="home">
+        <section class="main-visual">
+          <div class="main-background">
+            <div class="black-cover"></div>
+            <img src={ImgMainBackground} alt="" />
+          </div>
+          <div class="main-catch">
+            <p class="text1">Find your</p>
+            <p class="text2">BackGround</p>
+            <div class="searchbox">
+              <form action="/search" method="get">
+                <input placeholder="Type here.." type="text" name="search" />
+                <img src={ImgIconSearch} class="searchimg" />
+              </form>
+            </div>
+          </div>
         </section>
-    );
+
+        <section class="image-list">
+          <ul class="grid">
+            {images &&
+              images.map((image) => (
+                <li key={image.id}>
+                  <img
+                    src={
+                      "https://res.cloudinary.com/www-techis-io/" + image.image
+                    }
+                    class="image"
+                    alt=""
+                    onClick={() => clickImage(image.id)}
+                  />
+                  {image &&
+                    Object.values(favourites).filter(
+                      (favoriteImage) => image.id == favoriteImage.id
+                    ).length === 0 && (
+                      <img
+                        class="icon-heart"
+                        src={ImgIconHeart}
+                        onClick={() => clickFavourite(image)}
+                      />
+                    )}
+                </li>
+              ))}
+          </ul>
+          {hasNext && (
+            <div class="button">
+              <input type="submit" value="Show more" onClick={clickShowMore} />
+            </div>
+          )}
+        </section>
+      </div>
+    </>
+  );
 };
 
 export default Home;
